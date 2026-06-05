@@ -33,10 +33,10 @@ func main() {
 	}
 
 	if len(positionalArgs) < 2 {
-		fmt.Println("Usage: go run . <model.rten> <tokenizer.model> -q <question> -c <context>")
+		fmt.Println("Usage: go run . <model.rten> <tokenizer.json> -q <question> -c <context>")
 		fmt.Println()
 		fmt.Println("Example:")
-		fmt.Println("  go run . model.rten tokenizer.model -q \"What's your favorite Japanese food?\" -c \"Work deadlines piled up today.\"")
+		fmt.Println("  go run . model.rten tokenizer.json -q \"What's your favorite Japanese food?\" -c \"Work deadlines piled up today.\"")
 		os.Exit(1)
 	}
 
@@ -73,7 +73,7 @@ func main() {
 	fmt.Println("Model loaded successfully")
 
 	fmt.Println("Loading tokenizer...")
-	tk, err := rten.NewSentencePiece(tokenizerPath)
+	tk, err := rten.NewTokenizerFromFile(tokenizerPath)
 	if err != nil {
 		log.Fatalf("Failed to load tokenizer: %v", err)
 	}

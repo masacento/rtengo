@@ -48,7 +48,7 @@ func main() {
 	}
 
 	if len(positionalArgs) < 2 {
-		fmt.Println("Usage: go run . <model.rten> <tokenizer.model> -q <query> -d <document> [-t <threshold>] [-s]")
+		fmt.Println("Usage: go run . <model.rten> <tokenizer.json> -q <query> -d <document> [-t <threshold>] [-s]")
 		fmt.Println()
 		fmt.Println("Options:")
 		fmt.Println("  -q, --query      Query string")
@@ -57,7 +57,7 @@ func main() {
 		fmt.Println("  -s, --simple     Simple output (pruned document only)")
 		fmt.Println()
 		fmt.Println("Example:")
-		fmt.Println("  go run . model.rten tokenizer.model -q \"フランスの首都は？\" -d \"パリはフランスの首都です。東京は日本の首都です。\"")
+		fmt.Println("  go run . model.rten tokenizer.json -q \"フランスの首都は？\" -d \"パリはフランスの首都です。東京は日本の首都です。\"")
 		os.Exit(1)
 	}
 
@@ -104,7 +104,7 @@ func main() {
 	if !simple {
 		fmt.Println("Loading tokenizer...")
 	}
-	tk, err := rten.NewSentencePiece(tokenizerPath)
+	tk, err := rten.NewTokenizerFromFile(tokenizerPath)
 	if err != nil {
 		log.Fatalf("Failed to load tokenizer: %v", err)
 	}

@@ -7,13 +7,13 @@ import (
 	"testing"
 )
 
-func TestSentencePieceTokenizer_EncodeJapanese(t *testing.T) {
+func TestHuggingFaceTokenizer_Encode(t *testing.T) {
 	tokenizer, err := loadTestTokenizer()
 	if err != nil {
 		t.Fatalf("Failed to load tokenizer: %v", err)
 	}
 
-	text := "川べりでサーフボードを持った人たちがいます"
+	text := "Hello world!"
 	encoding, err := tokenizer.Encode(text, false)
 	if err != nil {
 		t.Fatalf("Failed to encode text: %v", err)
@@ -42,13 +42,13 @@ func TestSentencePieceTokenizer_EncodeJapanese(t *testing.T) {
 	}
 }
 
-func TestSentencePieceTokenizer_EncodeWithSpecialTokens(t *testing.T) {
+func TestHuggingFaceTokenizer_EncodeWithSpecialTokens(t *testing.T) {
 	tokenizer, err := loadTestTokenizer()
 	if err != nil {
 		t.Fatalf("Failed to load tokenizer: %v", err)
 	}
 
-	text := "川べりでサーフボードを持った人たちがいます"
+	text := "Hello world!"
 	encoding, err := tokenizer.Encode(text, true)
 	if err != nil {
 		t.Fatalf("Failed to encode text: %v", err)
@@ -57,15 +57,15 @@ func TestSentencePieceTokenizer_EncodeWithSpecialTokens(t *testing.T) {
 	if len(encoding.IDs) < 2 {
 		t.Fatalf("Expected at least two special tokens, got %d", len(encoding.IDs))
 	}
-	if encoding.Tokens[0] != "<s>" {
-		t.Errorf("Expected first token to be <s>, got %q", encoding.Tokens[0])
+	if encoding.Tokens[0] != "[CLS]" {
+		t.Errorf("Expected first token to be [CLS], got %q", encoding.Tokens[0])
 	}
-	if encoding.Tokens[len(encoding.Tokens)-1] != "</s>" {
-		t.Errorf("Expected last token to be </s>, got %q", encoding.Tokens[len(encoding.Tokens)-1])
+	if encoding.Tokens[len(encoding.Tokens)-1] != "[SEP]" {
+		t.Errorf("Expected last token to be [SEP], got %q", encoding.Tokens[len(encoding.Tokens)-1])
 	}
 }
 
-func TestSentencePieceTokenizer_DecodeEmpty(t *testing.T) {
+func TestHuggingFaceTokenizer_DecodeEmpty(t *testing.T) {
 	tokenizer, err := loadTestTokenizer()
 	if err != nil {
 		t.Fatalf("Failed to load tokenizer: %v", err)
@@ -77,16 +77,16 @@ func TestSentencePieceTokenizer_DecodeEmpty(t *testing.T) {
 }
 
 // LoadTokenizerFromDefaultPath loads a tokenizer from the default testdata path.
-func loadTestTokenizer() (*SentencePieceTokenizer, error) {
+func loadTestTokenizer() (*HuggingFaceTokenizer, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get working directory: %w", err)
 	}
 
-	tokenizerPath := filepath.Join(wd, "testdata", "tokenizer.model")
+	tokenizerPath := filepath.Join(wd, "testdata", "tokenizer.json")
 	if _, err := os.Stat(tokenizerPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("tokenizer file not found at %s", tokenizerPath)
 	}
 
-	return NewSentencePiece(tokenizerPath)
+	return NewTokenizerFromFile(tokenizerPath)
 }

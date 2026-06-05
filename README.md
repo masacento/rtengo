@@ -8,14 +8,14 @@ high-level APIs for text embedding, reranking, pruning, and image preprocessing.
 - Pure Go WASM runtime via `wazero` (no CGO)
 - RTen WASM embedded by default
 - Simple Runtime / Model / Tensor API
-- SentencePiece tokenizer support
+- Hugging Face `tokenizer.json` support
 - High-level task APIs (Embedding / Rerank / Prune)
 
 ## Requirements
 
 - Go 1.24+
 - RTen `.rten` model file
-- SentencePiece `tokenizer.model`
+- Hugging Face `tokenizer.json`
 
 ## Install
 
@@ -58,7 +58,7 @@ func main() {
   defer model.Close(ctx)
 
   // Tokenizer
-  tk, err := rten.NewSentencePiece("tokenizer.model")
+  tk, err := rten.NewTokenizerFromFile("tokenizer.json")
   if err != nil {
     log.Fatal(err)
   }

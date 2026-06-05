@@ -17,8 +17,8 @@ func main() {
 
 	args := flag.Args()
 	if len(args) < 3 {
-		fmt.Println("Usage: go run . <model.rten> <tokenizer.model> <text>")
-		fmt.Println("Example: go run . model.rten tokenizer.model \"text\"")
+		fmt.Println("Usage: go run . <model.rten> <tokenizer.json> <text>")
+		fmt.Println("Example: go run . model.rten tokenizer.json \"text\"")
 		os.Exit(1)
 	}
 
@@ -51,7 +51,7 @@ func main() {
 	fmt.Println("Model loaded successfully")
 
 	fmt.Println("Loading tokenizer...")
-	tk, err := rten.NewSentencePiece(tokenizerPath)
+	tk, err := rten.NewTokenizerFromFile(tokenizerPath)
 	if err != nil {
 		log.Fatalf("Failed to load tokenizer: %v", err)
 	}

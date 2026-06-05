@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/masacento/go-sentencepiece"
+	hftokenizer "github.com/masacento/tokenizer"
+	"github.com/masacento/tokenizer/pretrained"
 )
 
 // Tokenizer defines the interface for tokenizers.
@@ -20,56 +21,40 @@ type Encoding struct {
 	AttentionMask []int
 }
 
-// SentencePieceTokenizer implements Tokenizer using sentencepiece.
-type SentencePieceTokenizer struct {
-	processor *sentencepiece.Processor
+// HuggingFaceTokenizer implements Tokenizer using a Hugging Face tokenizer.json file.
+type HuggingFaceTokenizer struct {
+	tokenizer *hftokenizer.Tokenizer
 }
 
-// NewSentencePiece creates a new SentencePiece tokenizer from a model file.
-func NewSentencePiece(modelPath string) (*SentencePieceTokenizer, error) {
-	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("tokenizer file not found at %s", modelPath)
+// NewTokenizerFromFile creates a tokenizer from a Hugging Face tokenizer.json file.
+func NewTokenizerFromFile(tokenizerPath string) (*HuggingFaceTokenizer, error) {
+	if _, err := os.Stat(tokenizerPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("tokenizer file not found at %s", tokenizerPath)
 	}
 
-	proc, err := sentencepiece.NewProcessorFromPath(modelPath)
+	tk, err := pretrained.FromFile(tokenizerPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load sentencepiece model: %w", err)
+		return nil, fmt.Errorf("failed to load tokenizer: %w", err)
 	}
 
-	return &SentencePieceTokenizer{processor: proc}, nil
+	return &HuggingFaceTokenizer{tokenizer: tk}, nil
 }
 
 // Encode tokenizes the input text and returns an Encoding.
-func (t *SentencePieceTokenizer) Encode(text string, addSpecialTokens bool) (*Encoding, error) {
-	tokenList := t.processor.Encode(text)
-
-	tokenIDs := make([]int, len(tokenList))
-	tokens := make([]string, len(tokenList))
-	for i, token := range tokenList {
-		tokenIDs[i] = token.ID
-		tokens[i] = token.Text
-	}
-
-	if addSpecialTokens {
-		tokenIDs = append([]int{1}, tokenIDs...)
-		tokens = append([]string{"<s>"}, tokens...)
-		tokenIDs = append(tokenIDs, 2)
-		tokens = append(tokens, "</s>")
-	}
-
-	attentionMask := make([]int, len(tokenIDs))
-	for i := range attentionMask {
-		attentionMask[i] = 1
+func (t *HuggingFaceTokenizer) Encode(text string, addSpecialTokens bool) (*Encoding, error) {
+	encoding, err := t.tokenizer.EncodeSingle(text, addSpecialTokens)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Encoding{
-		Tokens:        tokens,
-		IDs:           tokenIDs,
-		AttentionMask: attentionMask,
+		Tokens:        encoding.Tokens,
+		IDs:           encoding.Ids,
+		AttentionMask: encoding.AttentionMask,
 	}, nil
 }
 
 // Decode converts token IDs back to text.
-func (t *SentencePieceTokenizer) Decode(ids []int) string {
-	return t.processor.Decode(ids)
+func (t *HuggingFaceTokenizer) Decode(ids []int) string {
+	return t.tokenizer.Decode(ids, true)
 }
