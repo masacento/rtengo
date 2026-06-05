@@ -1,0 +1,11 @@
+[package]
+name = "rtenwasm"
+version = "0.24.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+rten = { version = "0.24.0", default-features = true }
+rten-tensor = "0.24.0"
