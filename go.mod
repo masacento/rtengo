@@ -6,7 +6,6 @@ toolchain go1.24.5
 
 require (
 	github.com/masacento/tokenizer v0.0.0-20260605013542-eb37f5a2baf9
-	github.com/tetratelabs/wazero v1.10.1
 	golang.org/x/image v0.34.0
 )
 

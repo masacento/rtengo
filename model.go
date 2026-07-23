@@ -30,8 +30,16 @@ func (r *Runtime) LoadModel(ctx context.Context, model []byte) (*Model, error) {
 	}
 
 	results, err := r.rten.Call(ctx, "rten_load_model", uint64(modelPtr), uint64(len(model)))
+
+	// rten_load_model copies the model data internally, so the staging
+	// buffer can be released regardless of the outcome. Without this the
+	// buffer (the size of the whole model) leaks on every load, and
+	// repeated loads eventually exhaust the 4GiB wasm linear memory.
+	if derr := r.rten.Deallocate(ctx, modelPtr, uint32(len(model))); derr != nil && err == nil {
+		err = derr
+	}
+
 	if err != nil {
-		_ = r.rten.Deallocate(ctx, modelPtr, uint32(len(model)))
 		return nil, fmt.Errorf("rten_load_model failed: %w", err)
 	}
 

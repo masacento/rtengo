@@ -1,16 +1,21 @@
 WASM_TARGET ?= wasm32-wasip1
-OUT ?= ../internal/rtenwasm/rten.wasm.gz
+GEN_OUT ?= ../internal/genwasm
+GEN_IMPORT ?= github.com/masacento/rtengo/internal/genwasm
 
-.PHONY: check build install clean
+.PHONY: check build gen clean
 
 check:
 	cargo check
 
+# Build the WASM module.
+# Note: SIMD (simd128) must stay disabled because wasm2go does not support
+# v128 instructions, so no RUSTFLAGS=+simd128 here.
 build:
-	RUSTFLAGS="-C target-feature=+simd128" cargo build --release --target $(WASM_TARGET)
+	cargo build --release --target $(WASM_TARGET)
 
-install: build
-	gzip -9 -c target/$(WASM_TARGET)/release/rtenwasm.wasm > $(OUT)
+# Regenerate the Go module under internal/genwasm from the built WASM.
+gen: build
+	wasm2go -i target/$(WASM_TARGET)/release/rtenwasm.wasm -out-dir $(GEN_OUT) -pkg genwasm -import $(GEN_IMPORT)
 
 clean:
 	cargo clean

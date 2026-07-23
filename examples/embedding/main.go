@@ -13,18 +13,18 @@ import (
 )
 
 func main() {
+	modelPath := flag.String("model", "./model.rten", "path to model file")
+	tokenizerPath := flag.String("tokenizer", "./tokenizer.json", "path to tokenizer file")
 	flag.Parse()
 
 	args := flag.Args()
-	if len(args) < 3 {
-		fmt.Println("Usage: go run . <model.rten> <tokenizer.json> <text>")
-		fmt.Println("Example: go run . model.rten tokenizer.json \"text\"")
+	if len(args) < 1 {
+		fmt.Println("Usage: go run . [-model model.rten] [-tokenizer tokenizer.json] <text>")
+		fmt.Println("Example: go run . -model model.rten -tokenizer tokenizer.json \"text\"")
 		os.Exit(1)
 	}
 
-	modelPath := args[0]
-	tokenizerPath := args[1]
-	text := args[2]
+	text := args[0]
 
 	ctx := context.Background()
 
@@ -38,7 +38,7 @@ func main() {
 	fmt.Printf("RTen runtime initialized (%s)\n", time.Since(start).Truncate(time.Millisecond))
 
 	fmt.Println("Loading model...")
-	modelBytes, err := os.ReadFile(modelPath)
+	modelBytes, err := os.ReadFile(*modelPath)
 	if err != nil {
 		log.Fatalf("Failed to read model file: %v", err)
 	}
@@ -51,7 +51,7 @@ func main() {
 	fmt.Println("Model loaded successfully")
 
 	fmt.Println("Loading tokenizer...")
-	tk, err := rten.NewTokenizerFromFile(tokenizerPath)
+	tk, err := rten.NewTokenizerFromFile(*tokenizerPath)
 	if err != nil {
 		log.Fatalf("Failed to load tokenizer: %v", err)
 	}

@@ -1,12 +1,13 @@
 # rtengo
 
-Lightweight Go bindings for the RTen WebAssembly runtime. It runs RTen WASM on top of `wazero` and provides
+Lightweight Go bindings for the RTen WebAssembly runtime. The RTen WASM module is AOT-compiled to Go
+with [wasm2go](https://github.com/goccy/wasm2go) (generated code lives in `internal/genwasm`) and provides
 high-level APIs for text embedding, reranking, pruning, and image preprocessing.
 
 ## Features
 
-- Pure Go WASM runtime via `wazero` (no CGO)
-- RTen WASM embedded by default
+- No runtime WASM engine: RTen runs as plain Go code (native asm on amd64/arm64, pure-Go fallback elsewhere, no CGO)
+- RTen compiled in by default — no `.wasm` file needed at runtime
 - Simple Runtime / Model / Tensor API
 - Hugging Face `tokenizer.json` support
 - High-level task APIs (Embedding / Rerank / Prune)
