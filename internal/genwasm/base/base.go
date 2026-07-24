@@ -164,9 +164,46 @@ func I64_rem_u(x, y uint64) uint64 {
 
 func I32_rotl(x, y int32) int32 { return int32(bits.RotateLeft32(uint32(x), int(y&31))) }
 
-func I32_rotr(x, y int32) int32 { return int32(bits.RotateLeft32(uint32(x), -int(y&31))) }
-
 func I64_rotl(x, y int64) int64 { return int64(bits.RotateLeft64(uint64(x), int(y&63))) }
+
+func F32_min(x, y float32) float32 {
+	if x != x || y != y {
+		return float32(math.NaN())
+	}
+	if x < y {
+		return x
+	}
+	if y < x {
+		return y
+	}
+
+	if x == 0 {
+		if math.Signbit(float64(x)) {
+			return x
+		}
+		return y
+	}
+	return x
+}
+
+func F32_max(x, y float32) float32 {
+	if x != x || y != y {
+		return float32(math.NaN())
+	}
+	if x > y {
+		return x
+	}
+	if y > x {
+		return y
+	}
+	if x == 0 {
+		if math.Signbit(float64(x)) {
+			return y
+		}
+		return x
+	}
+	return x
+}
 
 func F32_abs(x float32) float32 {
 	return math.Float32frombits(math.Float32bits(x) &^ (1 << 31))
