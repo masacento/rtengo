@@ -1,3 +1,5 @@
+//go:build !arm64 && (!amd64 || !amd64.v2)
+
 package p1
 
 import (

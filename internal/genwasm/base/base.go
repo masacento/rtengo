@@ -164,46 +164,9 @@ func I64_rem_u(x, y uint64) uint64 {
 
 func I32_rotl(x, y int32) int32 { return int32(bits.RotateLeft32(uint32(x), int(y&31))) }
 
+func I32_rotr(x, y int32) int32 { return int32(bits.RotateLeft32(uint32(x), -int(y&31))) }
+
 func I64_rotl(x, y int64) int64 { return int64(bits.RotateLeft64(uint64(x), int(y&63))) }
-
-func F32_min(x, y float32) float32 {
-	if x != x || y != y {
-		return float32(math.NaN())
-	}
-	if x < y {
-		return x
-	}
-	if y < x {
-		return y
-	}
-
-	if x == 0 {
-		if math.Signbit(float64(x)) {
-			return x
-		}
-		return y
-	}
-	return x
-}
-
-func F32_max(x, y float32) float32 {
-	if x != x || y != y {
-		return float32(math.NaN())
-	}
-	if x > y {
-		return x
-	}
-	if y > x {
-		return y
-	}
-	if x == 0 {
-		if math.Signbit(float64(x)) {
-			return y
-		}
-		return x
-	}
-	return x
-}
 
 func F32_abs(x float32) float32 {
 	return math.Float32frombits(math.Float32bits(x) &^ (1 << 31))
@@ -265,9 +228,23 @@ func MemorySize(m *Module) int32 {
 	return int32(m.MemSize.Load() >> 16)
 }
 
+// wasmMemHardCap is the implementation limit on linear-memory size:
+// 65534 pages, two short of wasm32's architectural 65536. Growth past
+// it fails with -1 like any resource limit (the JS API allows an
+// engine to refuse any grow). Keeping memSize strictly below 2^32
+// minus a 128 KiB margin is what makes the coalesced SIMD bounds check
+// (simd_v128_load_rng) exact: a group whose unwrapped address range
+// reaches past memSize can then never be a group whose members all
+// individually landed in bounds via u32 wraparound.
+//
+// A function rather than a const because the helper extractor carries
+// only function declarations into the output (it must stay in sync
+// with codegen's wasmMemHardCapBytes).
+func WasmMemHardCap() uint64 { return (1 << 32) - (1 << 17) }
+
 // memoryGrow grows m.memory by n wasm pages (64 KiB each). Returns the
-// previous page count, or -1 if the new size would exceed maxMem. n may be 0,
-// which simply returns the current size.
+// previous page count, or -1 if the new size would exceed maxMem or
+// wasmMemHardCap. n may be 0, which simply returns the current size.
 //
 // len(m.memory) must always equal the exact wasm memory size (memory.size
 // and every bounds check depend on it), but the backing array is grown
@@ -292,7 +269,7 @@ func MemoryGrow(m *Module, n int32) int32 {
 	if m.MaxMem != 0 && want > m.MaxMem {
 		return -1
 	}
-	if want > 1<<32 {
+	if want > WasmMemHardCap() {
 		return -1
 	}
 	if m.MemShared {
@@ -317,8 +294,8 @@ func MemoryGrow(m *Module, n int32) int32 {
 	if m.MaxMem != 0 && newCap > m.MaxMem {
 		newCap = m.MaxMem
 	}
-	if newCap > 1<<32 {
-		newCap = 1 << 32
+	if newCap > WasmMemHardCap() {
+		newCap = WasmMemHardCap()
 	}
 	grown := make([]byte, want, newCap)
 	copy(grown, m.Memory)
@@ -359,14 +336,22 @@ func I32_rem_u_s(x, y int32) int32 { return int32(I32_rem_u(uint32(x), uint32(y)
 func I64_div_u_s(x, y int64) int64 { return int64(I64_div_u(uint64(x), uint64(y))) }
 func I64_rem_u_s(x, y int64) int64 { return int64(I64_rem_u(uint64(x), uint64(y))) }
 
-func F32_add(x, y float32) float32 { return x + y }
-func F32_sub(x, y float32) float32 { return x - y }
-func F32_mul(x, y float32) float32 { return x * y }
-func F32_div(x, y float32) float32 { return x / y }
-func F64_add(x, y float64) float64 { return x + y }
-func F64_sub(x, y float64) float64 { return x - y }
-func F64_mul(x, y float64) float64 { return x * y }
-func F64_div(x, y float64) float64 { return x / y }
+// The explicit same-type conversions are NOT redundant: they are
+// rounding points. Once these helpers inline, gc is free to fuse a
+// multiply feeding an add into a single FMA — legal Go, but wasm
+// requires every operation individually rounded, and a fused result
+// diverges from every wasm runtime (bitwise, and observably in greedy
+// sampling). A float conversion forces the intermediate rounding and
+// forbids the fusion (spec: Conversions, "rounds to the precision of
+// the target type"; the same rule math.FMA documents).
+func F32_add(x, y float32) float32 { return float32(x + y) }
+func F32_sub(x, y float32) float32 { return float32(x - y) }
+func F32_mul(x, y float32) float32 { return float32(x * y) }
+func F32_div(x, y float32) float32 { return float32(x / y) }
+func F64_add(x, y float64) float64 { return float64(x + y) }
+func F64_sub(x, y float64) float64 { return float64(x - y) }
+func F64_mul(x, y float64) float64 { return float64(x * y) }
+func F64_div(x, y float64) float64 { return float64(x / y) }
 
 func I32_clz(x int32) int32    { return int32(bits.LeadingZeros32(uint32(x))) }
 func I32_ctz(x int32) int32    { return int32(bits.TrailingZeros32(uint32(x))) }
@@ -1113,15 +1098,22 @@ type WasiStubs struct {
 	// host-controlled-whitelist intent as fsHook, for the network surface.
 	netHook func(op string) bool
 	// dialHook, when non-nil, is consulted before an OUTBOUND connect
-	// (Sock_connect) with the resolved network ("tcp"), dotted-quad IP, and
-	// port. Returning false denies the connection (EACCES). This is the
-	// outbound-network whitelist control point.
-	dialHook func(network, ip string, port int) bool
+	// (Sock_connect) with the resolved network ("tcp"), the HOST the guest
+	// resolved to reach this address (from the preceding Sock_getaddrinfo, or ""
+	// if the guest dialed a literal IP), the dotted-quad IP, and the port.
+	// Returning false denies the connection (EACCES). Passing the host lets the
+	// policy match host+port jointly, which a port-scoped rule needs — the IP
+	// alone cannot be tied back to the rule that authorized the name.
+	dialHook func(network, host, ip string, port int) bool
 	// resolveHook, when non-nil, is consulted before a name lookup
 	// (Sock_getaddrinfo) with the requested host. Returning false denies the
 	// resolution (the guest sees a gaierror). This is the hostname-level
 	// whitelist control point (e.g. block "example.com" by name).
 	resolveHook func(host string) bool
+	// resolvedHosts maps a resolved dotted-quad IP back to the host name the
+	// guest looked it up under (populated by Sock_getaddrinfo, read by
+	// Sock_connect), so the dial hook can be given the host. Guarded by mu.
+	resolvedHosts map[string]string
 	// fsys is the filesystem backend every guest path operation is routed
 	// through. Defaults to an osFS scoped to preopenDir (the host filesystem);
 	// SetFS swaps in an alternative (e.g. an in-memory FS) so each module can
@@ -1229,10 +1221,12 @@ func (w *WasiStubs) SetNetAccessHook(hook func(op string) bool) {
 }
 
 // SetDialHook installs a host-controlled OUTBOUND-connection policy. hook is
-// called with ("tcp", dotted-quad-IP, port) before each Sock_connect;
-// returning false denies the connection (the guest sees a connect EACCES).
-// Pass nil to clear (all outbound allowed, the default once outbound is wired).
-func (w *WasiStubs) SetDialHook(hook func(network, ip string, port int) bool) {
+// called with ("tcp", host, dotted-quad-IP, port) before each Sock_connect,
+// where host is the name the guest resolved to reach the IP (from the preceding
+// Sock_getaddrinfo) or "" for a literal-IP dial; returning false denies the
+// connection (the guest sees a connect EACCES). Pass nil to clear (all outbound
+// allowed, the default once outbound is wired).
+func (w *WasiStubs) SetDialHook(hook func(network, host, ip string, port int) bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.dialHook = hook
@@ -1547,6 +1541,7 @@ func (w *WasiStubs) Sock_getaddrinfo(m *Module, nodePtr, nodeLen, outPtr int32) 
 	if ip := net.ParseIP(host); ip != nil {
 		if v4 := ip.To4(); v4 != nil {
 			out[0], out[1], out[2], out[3] = v4[0], v4[1], v4[2], v4[3]
+			w.recordResolvedHost(v4, host)
 			return _wasiESUCCESS
 		}
 		return -_wasiEAFNOSUPPORT
@@ -1560,7 +1555,20 @@ func (w *WasiStubs) Sock_getaddrinfo(m *Module, nodePtr, nodeLen, outPtr int32) 
 		return -_wasiEAFNOSUPPORT
 	}
 	out[0], out[1], out[2], out[3] = v4[0], v4[1], v4[2], v4[3]
+	w.recordResolvedHost(v4, host)
 	return _wasiESUCCESS
+}
+
+// recordResolvedHost remembers that host resolved to v4, so a later Sock_connect
+// to that IP can hand the dial hook the host name it was looked up under.
+func (w *WasiStubs) recordResolvedHost(v4 net.IP, host string) {
+	ip := fmt.Sprintf("%d.%d.%d.%d", v4[0], v4[1], v4[2], v4[3])
+	w.mu.Lock()
+	if w.resolvedHosts == nil {
+		w.resolvedHosts = make(map[string]string)
+	}
+	w.resolvedHosts[ip] = host
+	w.mu.Unlock()
 }
 
 // SetEnv overrides the environment the guest sees via environ_get /
@@ -3036,9 +3044,12 @@ func (w *WasiStubs) Sock_socket(m *Module, domain, typ int32) int32 {
 // existing Sock_send / Sock_recv / Fd_close paths drive it. Returns 0 or a
 // negative errno.
 func (w *WasiStubs) Sock_connect(m *Module, fd, ipBE, port int32) int32 {
+	u := uint32(ipBE)
+	ip := fmt.Sprintf("%d.%d.%d.%d", u&0xff, (u>>8)&0xff, (u>>16)&0xff, (u>>24)&0xff)
 	w.mu.Lock()
 	op := w.fdTable[fd]
 	hook := w.dialHook
+	host := w.resolvedHosts[ip]
 	w.mu.Unlock()
 	if op == nil || !op.isSocket {
 		return -_wasiENOTSOCK
@@ -3046,10 +3057,8 @@ func (w *WasiStubs) Sock_connect(m *Module, fd, ipBE, port int32) int32 {
 	if op.conn != nil {
 		return -_wasiEISCONN
 	}
-	u := uint32(ipBE)
-	ip := fmt.Sprintf("%d.%d.%d.%d", u&0xff, (u>>8)&0xff, (u>>16)&0xff, (u>>24)&0xff)
 	p := int(uint16(port))
-	if hook != nil && !hook("tcp", ip, p) {
+	if hook != nil && !hook("tcp", host, ip, p) {
 		return -_wasiEACCES
 	}
 	conn, err := net.DialTimeout("tcp", net.JoinHostPort(ip, strconv.Itoa(p)), 30*time.Second)
